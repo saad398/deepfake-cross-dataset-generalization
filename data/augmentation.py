@@ -137,16 +137,25 @@ class RobustAugmentation:
         # Resolution scaling - simulate different resolutions
         if self.config.get('resolution_scaling', {}).get('enabled', True):
             scale_limit = self.config.get('resolution_scaling', {}).get('scale_limit', [0.8, 1.2])
-            # RandomScale expects scale_limit as a tuple (lower, upper) relative to 1.0
-            # e.g., [-0.2, 0.2] for 0.8 to 1.2
-            lower_bound = scale_limit[0] - 1.0
-            upper_bound = scale_limit[1] - 1.0
+            # Use RandomResizedCrop with different scale range to simulate resolution changes
+            # This is more reliable than RandomScale which may not be available in all albumentations versions
             transforms.append(
-                A.RandomScale(
-                    scale_limit=(lower_bound, upper_bound),
-                    interpolation=cv2.INTER_LINEAR,
-                    p=0.3
-                )
+                A.OneOf([
+                    A.Downscale(
+                        scale_min=0.5,
+                        scale_max=0.99,
+                        interpolation=cv2.INTER_LINEAR,
+                        p=1.0
+                    ),
+                    A.RandomResizedCrop(
+                        height=self.image_size,
+                        width=self.image_size,
+                        scale=(scale_limit[0], scale_limit[1]),
+                        ratio=(1.0, 1.0),
+                        interpolation=cv2.INTER_LINEAR,
+                        p=1.0
+                    ),
+                ], p=0.3)
             )
         
         # Normalize with ImageNet statistics
